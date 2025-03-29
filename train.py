@@ -3,6 +3,7 @@ from transformers import (
     AutoTokenizer,
     AutoModelForTokenClassification,
     DataCollatorForTokenClassification,
+    get_linear_schedule_with_warmup,
 )
 import torch
 import torch.nn as nn
@@ -13,7 +14,7 @@ from seqeval.metrics import classification_report
 # Configuration
 MODEL_NAME = "bert-base-cased"
 DATASET_NAME = "conll2003"
-NUM_EPOCHS = 3
+NUM_EPOCHS = 1
 BATCH_SIZE = 32
 LEARNING_RATE = 2e-5
 MAX_LENGTH = 128
@@ -22,16 +23,19 @@ MAX_LENGTH = 128
 def align_labels_with_tokens(labels, word_ids):
     new_labels = []
     current_word = None
+
     for word_id in word_ids:
-        if word_id != current_word:
-            current_word = word_id
-            label = -100 if word_id is None else labels[word_id]
-            new_labels.append(label)
-        elif word_id is None:
+        if word_id is None:
+            # Special token
             new_labels.append(-100)
+        elif word_id != current_word:
+            # New word
+            current_word = word_id
+            new_labels.append(labels[word_id])
         else:
-            label = labels[word_id]
-            new_labels.append(-100 if label == 0 else label)
+            # Subword of the same word
+            new_labels.append(-100)
+
     return new_labels
 
 # Model definition
@@ -63,7 +67,8 @@ def tokenize_and_align(examples, tokenizer):
         examples["tokens"],
         truncation=True,
         is_split_into_words=True,
-        max_length=MAX_LENGTH
+        max_length=MAX_LENGTH,
+        padding=False,
     )
     
     all_labels = examples["ner_tags"]
@@ -102,28 +107,32 @@ def train_model(model, train_loader, val_loader, label_names):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     
+    # optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=0.01)
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
+    num_training_steps = len(train_loader) * NUM_EPOCHS
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1 * num_training_steps, num_training_steps=num_training_steps)
     loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
     
     best_f1 = 0
     
     for epoch in range(NUM_EPOCHS):
-        train_epoch(model, train_loader, optimizer, loss_fn, device, epoch)
+        train_epoch(model, train_loader, optimizer, scheduler, loss_fn, device, epoch)
         val_f1 = validate_model(model, val_loader, label_names, device)
         
         if val_f1 > best_f1:
             save_best_model(model)
             best_f1 = val_f1
 
-def train_epoch(model, train_loader, optimizer, loss_fn, device, epoch):
+def train_epoch(model, train_loader, optimizer, scheduler, loss_fn, device, epoch):
     model.train()
     epoch_loss = 0
     
     with tqdm(train_loader, unit="batch", desc=f"Epoch {epoch+1}") as pbar:
         for batch in pbar:
-            input_ids = batch["input_ids"].to(device) 
-            attention_mask = batch["attention_mask"].to(device)
-            token_type_ids = batch["token_type_ids"].to(device)
+            batch = {k: v.to(device) for k, v in batch.items()}
+            input_ids = batch["input_ids"]
+            attention_mask = batch["attention_mask"]
+            token_type_ids = batch["token_type_ids"]
             
             optimizer.zero_grad()
             outputs = model(input_ids, attention_mask, token_type_ids)
@@ -131,6 +140,7 @@ def train_epoch(model, train_loader, optimizer, loss_fn, device, epoch):
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
+            scheduler.step()
             
             epoch_loss += loss.item()
             pbar.set_postfix(loss=loss.item())
@@ -142,9 +152,10 @@ def validate_model(model, val_loader, label_names, device):
     
     with torch.no_grad():
         for batch in val_loader:
-            input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
-            token_type_ids = batch["token_type_ids"].to(device)
+            batch = {k: v.to(device) for k, v in batch.items()}
+            input_ids = batch["input_ids"]
+            attention_mask = batch["attention_mask"]
+            token_type_ids = batch["token_type_ids"]
             
             outputs = model(input_ids, attention_mask, token_type_ids)
             preds = torch.argmax(outputs, dim=-1).cpu().numpy()
@@ -162,13 +173,13 @@ def validate_model(model, val_loader, label_names, device):
     return val_f1
 
 def save_best_model(model):
-    torch.save(model.state_dict(), "best_model.pt")
+    model.save_pretrained("best_model")
     print("New best model saved!")
 
 # Evaluation
 def evaluate_model(test_loader, label_names, device):
     best_model = NERModel(num_labels=len(label_names))
-    best_model.load_state_dict(torch.load("best_model.pt"))
+    best_model.load_state_dict(torch.load("best_model/pytorch_model.bin"))
     best_model.eval()
     best_model.to(device)
     
@@ -177,9 +188,10 @@ def evaluate_model(test_loader, label_names, device):
     
     with torch.no_grad():
         for batch in test_loader:
-            input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
-            token_type_ids = batch["token_type_ids"].to(device)
+            batch = {k: v.to(device) for k, v in batch.items()}
+            input_ids = batch["input_ids"]
+            attention_mask = batch["attention_mask"]
+            token_type_ids = batch["token_type_ids"]
             
             outputs = best_model(input_ids, attention_mask, token_type_ids)
             preds = torch.argmax(outputs, dim=-1).cpu().numpy()
