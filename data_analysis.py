@@ -90,3 +90,18 @@ def filter_dataset(k, dataset: Dataset):
 # filtered_dataset = filter_dataset(5, training_dataset)
 # print(filtered_dataset["ner_tags"])
 # print(training_dataset["ner_tags"])
+
+
+def find_sentence_ratio(sentence: list) -> tuple:
+    entity, non_entity = 0, 0
+    for x in sentence:
+        if x == 0:
+            non_entity += 1
+        else:
+            entity += 1
+    return (entity/(entity+non_entity), non_entity/(entity+non_entity))
+
+
+# Test
+# for x in sentences:
+#     print(find_sentence_ratio(x))
