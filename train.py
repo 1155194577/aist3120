@@ -10,7 +10,19 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from seqeval.metrics import classification_report
+from enum import Enum
 
+class classLabel(Enum):
+    O = 0
+    B_LOC = 1
+    I_LOC = 2
+    B_MISC = 3
+    I_MISC = 4
+    B_ORG = 5
+    I_ORG = 6
+    B_PER = 7
+    I_PER = 8
+    
 # Configuration
 MODEL_NAME = "bert-base-cased"
 DATASET_NAME = "conll2003"
@@ -58,7 +70,7 @@ class NERModel(nn.Module):
 
 # Data processing functions
 def load_and_tokenize_data():
-    dataset = load_dataset(DATASET_NAME)
+    dataset = load_dataset(DATASET_NAME, trust_remote_code=True)
     label_names = dataset["train"].features["ner_tags"].feature.names
     return dataset, label_names
 
@@ -185,6 +197,8 @@ def evaluate_model(test_loader, label_names, device):
     
     all_preds = []
     all_labels = []
+    confusion_matrix = {classLabel(i).name:[0]*9 for i in range(9)}
+    # print(confusion_matrix)
     
     with torch.no_grad():
         for batch in test_loader:
@@ -201,11 +215,19 @@ def evaluate_model(test_loader, label_names, device):
                 valid = labels[i] != -100
                 all_preds.append([label_names[p] for p in preds[i][valid]])
                 all_labels.append([label_names[l] for l in labels[i][valid]])
+                for x, y in zip(all_preds[-1], all_labels[-1]):
+                    confusion_matrix[y.replace('-', '_')   ][classLabel[x.replace('-', '_')].value] += 1
     
+    # print(all_preds[:5])
+    # print(all_labels[:5])
+
     report = classification_report(all_labels, all_preds, output_dict=True)
     test_f1 = report["micro avg"]["f1-score"]
     print(f"\nTest F1: {test_f1:.4f}")
     print(classification_report(all_labels, all_preds))
+    # Test
+    # print(confusion_matrix)
+    # return confusion_matrix
 
 def get_loader(): 
    tokenized_ds, label_names, tokenizer = process_data() 
