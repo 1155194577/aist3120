@@ -131,7 +131,7 @@ def train_model(model, train_loader, val_loader, label_names):
         val_f1 = validate_model(model, val_loader, label_names, device)
         
         if val_f1 > best_f1:
-            save_best_model(model)
+            # save_best_model(model)
             best_f1 = val_f1
 
 def train_epoch(model, train_loader, optimizer, scheduler, loss_fn, device, epoch):
@@ -183,9 +183,9 @@ def validate_model(model, val_loader, label_names, device):
     print(classification_report(all_labels, all_preds))
     return val_f1
 
-def save_best_model(model):
-    model.save_pretrained("best_model")
-    print("New best model saved!")
+# def save_best_model(model):
+#     model.save_pretrained("best_model")
+#     print("New best model saved!")
 
 # Evaluation
 def evaluate_model(trained_model, test_loader, label_names, device):
