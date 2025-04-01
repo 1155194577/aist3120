@@ -11,6 +11,9 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from seqeval.metrics import classification_report
 from enum import Enum
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class classLabel(Enum):
     O = 0
@@ -38,14 +41,11 @@ def align_labels_with_tokens(labels, word_ids):
 
     for word_id in word_ids:
         if word_id is None:
-            # Special token
             new_labels.append(-100)
         elif word_id != current_word:
-            # New word
             current_word = word_id
             new_labels.append(labels[word_id])
         else:
-            # Subword of the same word
             new_labels.append(-100)
 
     return new_labels
@@ -119,7 +119,6 @@ def train_model(model, train_loader, val_loader, label_names):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=0.01)
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
     num_training_steps = len(train_loader) * NUM_EPOCHS
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1 * num_training_steps, num_training_steps=num_training_steps)
@@ -189,54 +188,62 @@ def save_best_model(model):
     print("New best model saved!")
 
 # Evaluation
-def evaluate_model(test_loader, label_names, device):
-    best_model = NERModel(num_labels=len(label_names))
-    best_model.load_state_dict(torch.load("best_model/pytorch_model.bin"))
-    best_model.eval()
-    best_model.to(device)
+def evaluate_model(trained_model, test_loader, label_names, device):
+    trained_model.eval()
+    trained_model.to(device)
     
     all_preds = []
     all_labels = []
-    confusion_matrix = {classLabel(i).name:[0]*9 for i in range(9)}
-    # print(confusion_matrix)
+    confusion_matrix_data = np.zeros((len(classLabel), len(classLabel)), dtype=int)
     
     with torch.no_grad():
-        for batch in test_loader:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            input_ids = batch["input_ids"]
-            attention_mask = batch["attention_mask"]
-            token_type_ids = batch["token_type_ids"]
-            
-            outputs = best_model(input_ids, attention_mask, token_type_ids)
-            preds = torch.argmax(outputs, dim=-1).cpu().numpy()
-            labels = batch["labels"].cpu().numpy()
+        with tqdm(test_loader, unit="batch", desc="Evaluating") as pbar:
+            for batch in pbar:
+                batch = {k: v.to(device) for k, v in batch.items()}
+                input_ids = batch["input_ids"]
+                attention_mask = batch["attention_mask"]
+                token_type_ids = batch["token_type_ids"]
+                
+                outputs = trained_model(input_ids, attention_mask, token_type_ids)
+                preds = torch.argmax(outputs, dim=-1).cpu().numpy()
+                labels = batch["labels"].cpu().numpy()
 
-            for i in range(len(preds)):
-                valid = labels[i] != -100
-                all_preds.append([label_names[p] for p in preds[i][valid]])
-                all_labels.append([label_names[l] for l in labels[i][valid]])
-                for x, y in zip(all_preds[-1], all_labels[-1]):
-                    confusion_matrix[y.replace('-', '_')   ][classLabel[x.replace('-', '_')].value] += 1
-    
-    # print(all_preds[:5])
-    # print(all_labels[:5])
+                for i in range(len(preds)):
+                    valid = labels[i] != -100
+                    all_preds.append([label_names[p] for p in preds[i][valid]])
+                    all_labels.append([label_names[l] for l in labels[i][valid]])
+                    
+                    for x, y in zip(all_preds[-1], all_labels[-1]):
+                        confusion_matrix_data[classLabel[y.replace('-', '_')].value, classLabel[x.replace('-', '_')].value] += 1
+                
+                pbar.set_postfix({'Processed': len(all_preds)})
 
     report = classification_report(all_labels, all_preds, output_dict=True)
     test_f1 = report["micro avg"]["f1-score"]
     print(f"\nTest F1: {test_f1:.4f}")
     print(classification_report(all_labels, all_preds))
-    # Test
-    # print(confusion_matrix)
-    # return confusion_matrix
+    
+    plot_confusion_matrix(confusion_matrix_data, label_names)
+
+def plot_confusion_matrix(cm, labels):
+    plt.figure(figsize=(10, 7))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.title('Confusion Matrix')
+    plt.show()
 
 def get_loader(): 
    tokenized_ds, label_names, tokenizer = process_data() 
    return create_loader(tokenized_ds, tokenizer)
+
 # Main execution
 if __name__ == "__main__":
     tokenized_ds, label_names, tokenizer = process_data()
     loaders = create_loader(tokenized_ds, tokenizer)
     model = NERModel(num_labels=len(label_names))
     
-    train_model(model, loaders['train'], loaders['validation'], label_names)
-    evaluate_model(loaders['test'], label_names, torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    # Uncomment to train the model
+    # train_model(model, loaders['train'], loaders['validation'], label_names)
+    
+    evaluate_model(model, loaders['test'], label_names, torch.device("cuda" if torch.cuda.is_available() else "cpu"))
