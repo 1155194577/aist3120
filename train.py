@@ -33,6 +33,17 @@ NUM_EPOCHS = 1
 BATCH_SIZE = 32
 LEARNING_RATE = 2e-5
 MAX_LENGTH = 128
+WEIGHT_MAP = {
+    "O": 1.0,
+    "B_LOC": 1.0,
+    'I_LOC': 1.0,
+    'B_MISC': 1.0,
+    'I_MISC': 1.0,
+    'B_ORG': 1.0,
+    'I_ORG': 1.0,
+    'B_PER': 1.0,
+    'I_PER': 1.0
+}
 
 # Helper function for label alignment
 def align_labels_with_tokens(labels, word_ids):
@@ -115,14 +126,14 @@ def create_loader(tokenized_ds, tokenizer):
     }
 
 # Training loop
-def train_model(model, train_loader, val_loader, label_names):
+def train_model(model, train_loader, val_loader, label_names, weights):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
     num_training_steps = len(train_loader) * NUM_EPOCHS
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1 * num_training_steps, num_training_steps=num_training_steps)
-    loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
+    loss_fn = nn.CrossEntropyLoss(ignore_index=-100, weight=torch.tensor(weights))
     
     best_f1 = 0
     
@@ -242,8 +253,9 @@ if __name__ == "__main__":
     tokenized_ds, label_names, tokenizer = process_data()
     loaders = create_loader(tokenized_ds, tokenizer)
     model = NERModel(num_labels=len(label_names))
+    weights = list(WEIGHT_MAP.values())
     
     # Uncomment to train the model
-    # train_model(model, loaders['train'], loaders['validation'], label_names)
+    train_model(model, loaders['train'], loaders['validation'], label_names, weights)
     
     evaluate_model(model, loaders['test'], label_names, torch.device("cuda" if torch.cuda.is_available() else "cpu"))
