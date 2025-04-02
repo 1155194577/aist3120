@@ -126,24 +126,26 @@ def create_loader(tokenized_ds, tokenizer):
     }
 
 # Training loop
-def train_model(model, train_loader, val_loader, label_names, weights):
+def train_model(model, train_loader, val_loader, label_names, weights, training_loss):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
     num_training_steps = len(train_loader) * NUM_EPOCHS
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1 * num_training_steps, num_training_steps=num_training_steps)
-    loss_fn = nn.CrossEntropyLoss(ignore_index=-100, weight=torch.tensor(weights))
-    
+    loss_fn = nn.CrossEntropyLoss(ignore_index=-100, weight=torch.tensor(weights).to(device))
     best_f1 = 0
     
     for epoch in range(NUM_EPOCHS):
-        train_epoch(model, train_loader, optimizer, scheduler, loss_fn, device, epoch)
+        loss = train_epoch(model, train_loader, optimizer, scheduler, loss_fn, device, epoch)
+        training_loss.append(loss)
         val_f1 = validate_model(model, val_loader, label_names, device)
         
         if val_f1 > best_f1:
             # save_best_model(model)
             best_f1 = val_f1
+
+        torch.save(model.state_dict(), f'model_epoch{epoch+1}_parameters.pth')
 
 def train_epoch(model, train_loader, optimizer, scheduler, loss_fn, device, epoch):
     model.train()
@@ -166,6 +168,10 @@ def train_epoch(model, train_loader, optimizer, scheduler, loss_fn, device, epoc
             
             epoch_loss += loss.item()
             pbar.set_postfix(loss=loss.item())
+        
+        return epoch_loss/len(pbar)
+    
+    
 
 def validate_model(model, val_loader, label_names, device):
     model.eval()
@@ -236,12 +242,46 @@ def evaluate_model(trained_model, test_loader, label_names, device):
     
     plot_confusion_matrix(confusion_matrix_data, label_names)
 
+    return report
+
 def plot_confusion_matrix(cm, labels):
     plt.figure(figsize=(10, 7))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
     plt.title('Confusion Matrix')
+    plt.show()
+
+def plot_results(model, test_loader, label_names, device, loss):
+
+    recall, precision, f1_score = [], [], []
+    for i in range(NUM_EPOCHS):
+        # model.load_state_dict(torch.load(f'model_epoch{i+1}_parameters.pth'))
+        report = evaluate_model(model, test_loader, label_names, device)
+        recall.append(report['weighted avg']['recall'])
+        precision.append(report['weighted avg']['precision'])
+        f1_score.append(report['weighted avg']['f1-score'])
+
+    x = np.linspace(1, NUM_EPOCHS, num=NUM_EPOCHS)
+    
+    # Plot recall, precision, and f1-score
+    plt.figure(figsize=(10, 5))
+    plt.plot(x, recall, label='Recall')
+    plt.plot(x, precision, label='Precision')
+    plt.plot(x, f1_score, label='F1-Score')
+    plt.xlabel('Number of Epochs')
+    plt.ylabel('Metrics')
+    plt.title('Evaluation Metrics Over Epochs')
+    plt.legend()
+    plt.show()
+
+    # Plot loss separately
+    plt.figure(figsize=(10, 5))
+    plt.plot(x, loss, label='Loss', color='red')
+    plt.xlabel('Number of Epochs')
+    plt.ylabel('Loss')
+    plt.title('Training Loss Over Epochs')
+    plt.legend()
     plt.show()
 
 def get_loader(): 
@@ -256,6 +296,8 @@ if __name__ == "__main__":
     weights = list(WEIGHT_MAP.values())
     
     # Uncomment to train the model
-    train_model(model, loaders['train'], loaders['validation'], label_names, weights)
+    training_loss = []
+    train_model(model, loaders['train'], loaders['validation'], label_names, weights, training_loss)
     
-    evaluate_model(model, loaders['test'], label_names, torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    # evaluate_model(model, loaders['test'], label_names, torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    plot_results(model, loaders['test'], label_names, torch.device("cuda" if torch.cuda.is_available() else "cpu"), training_loss)
