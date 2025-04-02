@@ -248,8 +248,7 @@ def plot_results(training_stats):
     plt.figure(figsize=(10, 5))
     plt.plot(x, training_stats['recalls'], label='Recall')
     plt.plot(x, training_stats['precisions'], label='Precision')
-    f1_score = 2 * (np.array(training_stats['recalls']) * np.array(training_stats['precisions'])) / (np.array(training_stats['recalls']) + np.array(training_stats['precisions']))
-    plt.plot(x, f1_score, label='F1-Score')
+    plt.plot(x, training_stats['f1_scores'], label='F1-Score')
     plt.xlabel('Number of Epochs')
     plt.ylabel('Metrics')
     plt.title('Evaluation Metrics Over Epochs')
@@ -270,7 +269,7 @@ if __name__ == "__main__":
     loaders = create_data_loaders(tokenized_ds, tokenizer)
     model = NERModel(num_labels=len(label_names))
     weights = list(WEIGHT_MAP.values())
-    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     training_stats = {
         'loss': [],
         'recalls': [],
@@ -279,5 +278,5 @@ if __name__ == "__main__":
     }
     
     train_model(model, loaders['train'], loaders['validation'], label_names, weights, training_stats)
-    evaluate_model(model, loaders['test'], label_names, torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    evaluate_model(model, loaders['test'], label_names, device)
     plot_results(training_stats)

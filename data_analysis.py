@@ -139,3 +139,7 @@ for k in range(0, 25):
     plot_pie_chart(k)
 
 #haha
+
+# k against training_data size 
+
+#(1) modify the code in train.py, plot the avg loss,recall and precision and F1-score against epochs
