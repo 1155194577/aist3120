@@ -261,13 +261,26 @@ def plot_results(model, test_loader, label_names, device, loss):
         recall.append(report['weighted avg']['recall'])
         precision.append(report['weighted avg']['precision'])
         f1_score.append(report['weighted avg']['f1-score'])
-    print(recall,precision,f1_score,loss)
-    x = np.linspace(0, NUM_EPOCHS, num=NUM_EPOCHS)
-    plt.plot(x, recall, label='recall')
-    plt.plot(x, precision, label='precision')
-    plt.plot(x, f1_score, label='f1-score')
-    plt.plot(x, loss, label='loss')
-    plt.xlabel('number of epochs')
+
+    x = np.linspace(1, NUM_EPOCHS, num=NUM_EPOCHS)
+    
+    # Plot recall, precision, and f1-score
+    plt.figure(figsize=(10, 5))
+    plt.plot(x, recall, label='Recall')
+    plt.plot(x, precision, label='Precision')
+    plt.plot(x, f1_score, label='F1-Score')
+    plt.xlabel('Number of Epochs')
+    plt.ylabel('Metrics')
+    plt.title('Evaluation Metrics Over Epochs')
+    plt.legend()
+    plt.show()
+
+    # Plot loss separately
+    plt.figure(figsize=(10, 5))
+    plt.plot(x, loss, label='Loss', color='red')
+    plt.xlabel('Number of Epochs')
+    plt.ylabel('Loss')
+    plt.title('Training Loss Over Epochs')
     plt.legend()
     plt.show()
 
@@ -283,8 +296,8 @@ if __name__ == "__main__":
     weights = list(WEIGHT_MAP.values())
     
     # Uncomment to train the model
-    training_loss = [i for i in range(NUM_EPOCHS)]
-    # train_model(model, loaders['train'], loaders['validation'], label_names, weights, training_loss)
+    training_loss = []
+    train_model(model, loaders['train'], loaders['validation'], label_names, weights, training_loss)
     
     # evaluate_model(model, loaders['test'], label_names, torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     plot_results(model, loaders['test'], label_names, torch.device("cuda" if torch.cuda.is_available() else "cpu"), training_loss)
