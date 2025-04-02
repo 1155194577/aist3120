@@ -133,8 +133,7 @@ def train_model(model, train_loader, val_loader, label_names, weights, training_
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
     num_training_steps = len(train_loader) * NUM_EPOCHS
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1 * num_training_steps, num_training_steps=num_training_steps)
-    loss_fn = nn.CrossEntropyLoss(ignore_index=-100, weight=torch.tensor(weights))
-    
+    loss_fn = nn.CrossEntropyLoss(ignore_index=-100, weight=torch.tensor(weights).to(device))
     best_f1 = 0
     
     for epoch in range(NUM_EPOCHS):
