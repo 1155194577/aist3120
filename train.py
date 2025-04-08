@@ -44,8 +44,34 @@ WEIGHT_MAP = {
     'B_PER': 1.0,
     'I_PER': 1.0
 }
+LOSS_FUNCTION = "cross_entropy" # Options: "cross_entropy", "focal_loss", "dice_loss"
 
-# Helper functions
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1.0, gamma=2.0, ignore_index=-100):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.ignore_index = ignore_index
+
+    def forward(self, inputs, targets):
+        # Compute softmax
+        BCE_loss = nn.CrossEntropyLoss(reduction='none', ignore_index=self.ignore_index)(inputs, targets)
+        pt = torch.exp(-BCE_loss)  # Probability of true class
+        F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss  # Focal loss formula
+        return F_loss.mean()  # Return the mean loss
+    
+class DiceLoss(nn.Module):
+    def __init__(self, ignore_index=-100):
+        super(DiceLoss, self).__init__()
+        self.ignore_index = ignore_index
+
+    def forward(self, inputs, targets):
+        inputs = torch.sigmoid(inputs)
+        inputs = (inputs > 0.5).float()
+        intersection = (inputs * targets).sum()
+        dice_score = (2. * intersection + 1) / (inputs.sum() + targets.sum() + 1)
+        return 1 - dice_score.mean()  # Return the mean loss
+    
 def align_labels_with_tokens(labels, word_ids):
     new_labels = []
     current_word = None
@@ -127,13 +153,23 @@ def initialize_optimizer_and_scheduler(model, train_loader):
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1 * num_training_steps, num_training_steps=num_training_steps)
     return optimizer, scheduler
 
+def get_loss_function(loss_type, weights=None):
+    if loss_type == "cross_entropy":
+        return nn.CrossEntropyLoss(ignore_index=-100, weight=weights)
+    elif loss_type == "focal_loss":
+        return FocalLoss(alpha=1.0, gamma=2.0, ignore_index=-100)
+    elif loss_type == "dice_loss":
+        return DiceLoss(ignore_index=-100)
+    else:
+        raise ValueError(f"Unknown loss type: {loss_type}")
+    
 def train_model(model, train_loader, val_loader, label_names, weights, training_stats):
     print("Training the model...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
     optimizer, scheduler = initialize_optimizer_and_scheduler(model, train_loader)
-    loss_fn = nn.CrossEntropyLoss(ignore_index=-100, weight=torch.tensor(weights).to(device))
+    loss_fn = get_loss_function(LOSS_FUNCTION, weights)
     best_f1 = 0
 
     for epoch in range(NUM_EPOCHS):
