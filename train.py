@@ -1,4 +1,4 @@
-from datasets import load_dataset
+from datasets import load_dataset,load_from_disk
 from transformers import (
     AutoTokenizer,
     AutoModelForTokenClassification,
@@ -28,7 +28,7 @@ class classLabel(Enum):
 
 # Configuration
 MODEL_NAME = "bert-base-cased"
-DATASET_NAME = "conll2003"
+DATASET_PATH = "conll2003"
 NUM_EPOCHS = 2
 BATCH_SIZE = 64
 LEARNING_RATE = 0.01
@@ -60,7 +60,7 @@ def align_labels_with_tokens(labels, word_ids):
     return new_labels
 
 def load_and_tokenize_data():
-    dataset = load_dataset(DATASET_NAME, trust_remote_code=True)
+    dataset = load_from_disk(DATASET_PATH) 
     label_names = dataset["train"].features["ner_tags"].feature.names
     return dataset, label_names
 
