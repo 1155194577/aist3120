@@ -155,7 +155,7 @@ def initialize_optimizer_and_scheduler(model, train_loader):
 
 def get_loss_function(loss_type, weights=None):
     if loss_type == "cross_entropy":
-        return nn.CrossEntropyLoss(ignore_index=-100, weight=weights)
+        return nn.CrossEntropyLoss(ignore_index=-100, weight=None)
     elif loss_type == "focal_loss":
         return FocalLoss(alpha=1.0, gamma=2.0, ignore_index=-100)
     elif loss_type == "dice_loss":
