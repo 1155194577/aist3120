@@ -270,35 +270,38 @@ def evaluate_model(trained_model, test_loader, label_names, device):
     print(classification_report(all_labels, all_preds))
     
     plot_confusion_matrix(confusion_matrix_data, label_names)
+    def plot_confusion_matrix(cm, labels):
+        plt.figure(figsize=(10, 7))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+        plt.title('Confusion Matrix')
+        plt.savefig('confusion_matrix.png')  # Save the figure
+        plt.show()
 
-def plot_confusion_matrix(cm, labels):
-    plt.figure(figsize=(10, 7))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.title('Confusion Matrix')
-    plt.show()
+    def plot_results(training_stats):
+        x = np.linspace(1, NUM_EPOCHS, num=NUM_EPOCHS)
+        plt.figure(figsize=(10, 5))
+        plt.plot(x, training_stats['recalls'], label='Recall')
+        plt.plot(x, training_stats['precisions'], label='Precision')
+        plt.plot(x, training_stats['f1_scores'], label='F1-Score')
+        plt.xlabel('Number of Epochs')
+        plt.ylabel('Metrics')
+        plt.title('Evaluation Metrics Over Epochs')
+        plt.legend()
+        plt.savefig('evaluation_metrics.png')  # Save the figure
+        plt.show()
 
-def plot_results(training_stats):
-    x = np.linspace(1, NUM_EPOCHS, num=NUM_EPOCHS)
-    plt.figure(figsize=(10, 5))
-    plt.plot(x, training_stats['recalls'], label='Recall')
-    plt.plot(x, training_stats['precisions'], label='Precision')
-    plt.plot(x, training_stats['f1_scores'], label='F1-Score')
-    plt.xlabel('Number of Epochs')
-    plt.ylabel('Metrics')
-    plt.title('Evaluation Metrics Over Epochs')
-    plt.legend()
-    plt.show()
-
-    plt.figure(figsize=(10, 5))
-    plt.plot(x, training_stats['loss'], label='Loss', color='red')
-    plt.xlabel('Number of Epochs')
-    plt.ylabel('Loss')
-    plt.title('Training Loss Over Epochs')
-    plt.legend()
-    plt.show()
-
+        plt.figure(figsize=(10, 5))
+        plt.plot(x, training_stats['loss'], label='Loss', color='red')
+        plt.xlabel('Number of Epochs')
+        plt.ylabel('Loss')
+        plt.title('Training Loss Over Epochs')
+        plt.legend()
+        plt.savefig('training_loss.png')  # Save the figure
+        plt.show()
+    
+    
 # Main execution
 if __name__ == "__main__":
     tokenized_ds, label_names, tokenizer = process_data()
