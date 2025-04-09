@@ -270,7 +270,7 @@ def evaluate_model(trained_model, test_loader, label_names, device):
     print(classification_report(all_labels, all_preds))
     
     plot_confusion_matrix(confusion_matrix_data, label_names)
-    def plot_confusion_matrix(cm, labels):
+def plot_confusion_matrix(cm, labels):
         plt.figure(figsize=(10, 7))
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
         plt.ylabel('True label')
@@ -279,7 +279,7 @@ def evaluate_model(trained_model, test_loader, label_names, device):
         plt.savefig('confusion_matrix.png')  # Save the figure
         plt.show()
 
-    def plot_results(training_stats):
+def plot_results(training_stats):
         x = np.linspace(1, NUM_EPOCHS, num=NUM_EPOCHS)
         plt.figure(figsize=(10, 5))
         plt.plot(x, training_stats['recalls'], label='Recall')
