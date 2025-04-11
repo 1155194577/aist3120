@@ -170,9 +170,9 @@ def initialize_optimizer_and_scheduler(model, train_loader):
     if OPTIMIZER == "sgd":
         optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
     elif OPTIMIZER == "adagrad":
-        optimizer = torch.optim.Adagrad(model.parameters(), lr=LEARNING_RATE)
+        optimizer = torch.optim.Adagrad(model.parameters(), lr=LEARNING_RATE,eps=1e-6)
     elif OPTIMIZER == "adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE,eps=1e-6)
     else:
         raise ValueError(f"Unknown optimizer type: {OPTIMIZER}")
     num_training_steps = len(train_loader) * NUM_EPOCHS
