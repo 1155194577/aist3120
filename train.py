@@ -29,7 +29,7 @@ class classLabel(Enum):
 # Configuration
 MODEL_NAME = "bert-base-cased"
 DATASET_PATH = "conll2003"
-NUM_EPOCHS = 5
+NUM_EPOCHS = 10
 BATCH_SIZE = 64
 LEARNING_RATE = 0.01
 MAX_LENGTH = 128
@@ -45,7 +45,7 @@ WEIGHT_MAP = {
     'I_PER': 1.0
 }
 LOSS_FUNCTION = "dice_loss" # Options: "cross_entropy", "focal_loss", "dice_loss"
-
+OPTIMIZER = "adagrad" # Options: "sgd", "adagrad", "adam"
 class FocalLoss(nn.Module):
     def __init__(self, alpha=1.0, gamma=2.0, ignore_index=-100):
         super(FocalLoss, self).__init__()
@@ -104,8 +104,8 @@ def align_labels_with_tokens(labels, word_ids):
     return new_labels
 
 def load_and_tokenize_data():
-    # dataset = load_from_disk(DATASET_PATH) 
-    dataset = load_dataset(DATASET_PATH)
+    dataset = load_from_disk(DATASET_PATH) 
+    # dataset = load_dataset(DATASET_PATH)
     label_names = dataset["train"].features["ner_tags"].feature.names
     return dataset, label_names
 
@@ -167,7 +167,14 @@ class NERModel(nn.Module):
         return outputs.logits
 
 def initialize_optimizer_and_scheduler(model, train_loader):
-    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
+    if OPTIMIZER == "sgd":
+        optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
+    elif OPTIMIZER == "adagrad":
+        optimizer = torch.optim.Adagrad(model.parameters(), lr=LEARNING_RATE)
+    elif OPTIMIZER == "adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    else:
+        raise ValueError(f"Unknown optimizer type: {OPTIMIZER}")
     num_training_steps = len(train_loader) * NUM_EPOCHS
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1 * num_training_steps, num_training_steps=num_training_steps)
     return optimizer, scheduler
@@ -327,8 +334,9 @@ if __name__ == "__main__":
     loaders = create_data_loaders(tokenized_ds, tokenizer)
     model = NERModel(num_labels=len(label_names))
     weights = list(WEIGHT_MAP.values())
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # device = torch.device("mps")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    print(device)
     training_stats = {
         'loss': [],
         'recalls': [],
