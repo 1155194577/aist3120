@@ -29,7 +29,7 @@ class classLabel(Enum):
 # Configuration
 MODEL_NAME = "bert-base-cased"
 DATASET_PATH = "conll2003"
-NUM_EPOCHS = 2
+NUM_EPOCHS = 5
 BATCH_SIZE = 64
 LEARNING_RATE = 0.01
 MAX_LENGTH = 128
@@ -44,7 +44,7 @@ WEIGHT_MAP = {
     'B_PER': 1.0,
     'I_PER': 1.0
 }
-LOSS_FUNCTION = "cross_entropy" # Options: "cross_entropy", "focal_loss", "dice_loss"
+LOSS_FUNCTION = "dice_loss" # Options: "cross_entropy", "focal_loss", "dice_loss"
 
 class FocalLoss(nn.Module):
     def __init__(self, alpha=1.0, gamma=2.0, ignore_index=-100):
@@ -61,17 +61,35 @@ class FocalLoss(nn.Module):
         return F_loss.mean()  # Return the mean loss
     
 class DiceLoss(nn.Module):
-    def __init__(self, ignore_index=-100):
-        super(DiceLoss, self).__init__()
+    def __init__(self, ignore_index=-100, eps=1e-6):
+        super().__init__()
         self.ignore_index = ignore_index
-
+        self.eps = eps
     def forward(self, inputs, targets):
-        inputs = torch.sigmoid(inputs)
-        inputs = (inputs > 0.5).float()
-        intersection = (inputs * targets).sum()
-        dice_score = (2. * intersection + 1) / (inputs.sum() + targets.sum() + 1)
-        return 1 - dice_score.mean()  # Return the mean loss
-    
+        # Inputs: (N*L, C) logits, Targets: (N*L)
+        probs = torch.softmax(inputs, dim=-1)  # Convert to probabilities
+        C = probs.shape[-1]
+        
+        # Create mask for valid tokens (ignore_index tokens are excluded)
+        mask = targets != self.ignore_index
+        targets_masked = torch.where(mask, targets, 0)  # Temporary valid class to avoid one-hot error
+        
+        # Convert to one-hot and apply mask
+        targets_one_hot = torch.nn.functional.one_hot(targets_masked, num_classes=C).float()
+        targets_one_hot = targets_one_hot.to(probs.device)
+        
+        # Zero out ignored positions in both probs and targets
+        probs = probs * mask.unsqueeze(-1)
+        targets_one_hot = targets_one_hot * mask.unsqueeze(-1)
+        
+        # Compute Dice score per class
+        intersection = (probs * targets_one_hot).sum(dim=0)
+        sum_probs = probs.sum(dim=0)
+        sum_targets = targets_one_hot.sum(dim=0)
+        
+        dice = (2. * intersection + self.eps) / (sum_probs + sum_targets + self.eps)
+        return 1 - dice.mean()
+       
 def align_labels_with_tokens(labels, word_ids):
     new_labels = []
     current_word = None
@@ -86,7 +104,8 @@ def align_labels_with_tokens(labels, word_ids):
     return new_labels
 
 def load_and_tokenize_data():
-    dataset = load_from_disk(DATASET_PATH) 
+    # dataset = load_from_disk(DATASET_PATH) 
+    dataset = load_dataset(DATASET_PATH)
     label_names = dataset["train"].features["ner_tags"].feature.names
     return dataset, label_names
 
@@ -309,6 +328,7 @@ if __name__ == "__main__":
     model = NERModel(num_labels=len(label_names))
     weights = list(WEIGHT_MAP.values())
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("mps")
     training_stats = {
         'loss': [],
         'recalls': [],
@@ -319,3 +339,5 @@ if __name__ == "__main__":
     train_model(model, loaders['train'], loaders['validation'], label_names, weights, training_stats)
     evaluate_model(model, loaders['test'], label_names, device)
     plot_results(training_stats)
+
+
