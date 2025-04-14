@@ -343,7 +343,7 @@ def evaluate_model(trained_model, test_loader, label_names, device):
                 
                 pbar.set_postfix({'Processed': len(all_preds)})
 
-    report = classification_report(all_labels, all_preds, output_dict=True)
+    report = classification_report(all_labels, all_preds, output_dict=True,digits=4)
     test_f1 = report["micro avg"]["f1-score"]
     print(f"\nTest F1: {test_f1:.4f}")
     print(classification_report(all_labels, all_preds))
