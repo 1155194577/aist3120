@@ -29,7 +29,7 @@ class classLabel(Enum):
 # Configuration
 MODEL_NAME = "bert-base-cased"
 DATASET_PATH = "conll2003"
-LOSS_FUNCTION = "focal_loss" # Options: "cross_entropy", "focal_loss", "dice_loss"
+LOSS_FUNCTION = "combined_focal_dice_loss" # Options: "cross_entropy", "focal_loss", "dice_loss", "combined_focal_dice_loss"
 OPTIMIZER = "sgd" # Options: "sgd", "adagrad", "adam"
 NUM_EPOCHS = 10
 BATCH_SIZE = 64
@@ -91,7 +91,16 @@ class DiceLoss(nn.Module):
         
         dice = (2. * intersection + self.eps) / (sum_probs + sum_targets + self.eps)
         return 1 - dice.mean()
-       
+class Combined_Focal_Dice_Loss(nn.Module):
+    def __init__(self, alpha=1.0, gamma=2.0, ignore_index=-100):
+        super(Combined_Focal_Dice_Loss, self).__init__()
+        self.focal_loss = FocalLoss(alpha, gamma, ignore_index)
+        self.dice_loss = DiceLoss(ignore_index)
+
+    def forward(self, inputs, targets):
+        focal_loss_value = self.focal_loss(inputs, targets)
+        dice_loss_value = self.dice_loss(inputs, targets)
+        return focal_loss_value + dice_loss_value
 def align_labels_with_tokens(labels, word_ids):
     new_labels = []
     current_word = None
@@ -188,6 +197,8 @@ def get_loss_function(loss_type, weights=None):
         return FocalLoss(alpha=1.0, gamma=2.0, ignore_index=-100)
     elif loss_type == "dice_loss":
         return DiceLoss(ignore_index=-100)
+    elif loss_type == "combined_focal_dice_loss":
+        return Combined_Focal_Dice_Loss(alpha=1.0, gamma=2.0, ignore_index=-100)
     else:
         raise ValueError(f"Unknown loss type: {loss_type}")
     
