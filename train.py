@@ -29,7 +29,7 @@ class classLabel(Enum):
 # Configuration
 MODEL_NAME = "bert-base-cased"
 DATASET_PATH = "conll2003"
-NUM_EPOCHS = 10
+NUM_EPOCHS = 
 BATCH_SIZE = 64
 LEARNING_RATE = 0.01
 MAX_LENGTH = 128
@@ -45,7 +45,7 @@ WEIGHT_MAP = {
     'B_PER': 1.0,
     'I_PER': 1.0
 }
-LOSS_FUNCTION = "cross_entropy" # Options: "cross_entropy", "focal_loss", "dice_loss"
+LOSS_FUNCTION = "dice_loss" # Options: "cross_entropy", "focal_loss", "dice_loss"
 OPTIMIZER = "sgd" # Options: "sgd", "adagrad", "adam"
 class FocalLoss(nn.Module):
     def __init__(self, alpha=1.0, gamma=2.0, ignore_index=-100):
@@ -204,12 +204,12 @@ def train_model(model, train_loader, val_loader, label_names, weights, training_
         training_stats['loss'].append(loss)
         report = validate_model(model, val_loader, label_names, device)
         val_f1 = report["micro avg"]["f1-score"]
-        #recall = report["micro avg"]["recall"]
-        #precision = report["micro avg"]["precision"]
+        recall = report["micro avg"]["recall"]
+        precision = report["micro avg"]["precision"]
 
-        #training_stats['recalls'].append(recall)
-        #training_stats['precisions'].append(precision)
-        training_stats['validation_f1_scores'].append(val_f1)
+        training_stats['recalls'].append(recall)
+        training_stats['precisions'].append(precision)
+        training_stats['f1_scores'].append(val_f1)
        
         if val_f1 > best_f1:
             best_f1 = val_f1
@@ -309,13 +309,14 @@ def plot_confusion_matrix(cm, labels):
 def plot_results(training_stats):
         x = np.linspace(1, NUM_EPOCHS, num=NUM_EPOCHS)
         plt.figure(figsize=(10, 5))
-        plt.plot(x, training_stats['validation_f1_scores'], label='Validation F1-Score', color='blue')
-        #plt.plot(x, training_stats['training_f1_scores'], label='Training F1-Score', color='green')
+        plt.plot(x, training_stats['recalls'], label='Recall')
+        plt.plot(x, training_stats['precisions'], label='Precision')
+        plt.plot(x, training_stats['f1_scores'], label='F1-Score')
         plt.xlabel('Number of Epochs')
-        plt.ylabel('F1-Score')
-        plt.title('Training and Validation F1-Score Over Epochs')
+        plt.ylabel('Metrics')
+        plt.title('Evaluation Metrics Over Epochs')
         plt.legend()
-        plt.savefig('f1_scores.png')  # Save the figure
+        plt.savefig('evaluation_metrics.png')  # Save the figure
         plt.show()
 
         plt.figure(figsize=(10, 5))
@@ -334,13 +335,14 @@ if __name__ == "__main__":
     loaders = create_data_loaders(tokenized_ds, tokenizer)
     model = NERModel(num_labels=len(label_names))
     weights = list(WEIGHT_MAP.values())
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     print(device)
     training_stats = {
         'loss': [],
-        'training_f1_scores': [],
-        'validation_f1_scores': [],
+        'recalls': [],
+        'precisions': [],
+        'f1_scores': []
     }
     
     train_model(model, loaders['train'], loaders['validation'], label_names, weights, training_stats)
