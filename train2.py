@@ -346,7 +346,7 @@ def evaluate_model(trained_model, test_loader, label_names, device):
     report = classification_report(all_labels, all_preds, output_dict=True,digits=4)
     test_f1 = report["micro avg"]["f1-score"]
     print(f"\nTest F1: {test_f1:.4f}")
-    print(classification_report(all_labels, all_preds))
+    print(classification_report(all_labels, all_preds, digits=4))
     
     plot_confusion_matrix(confusion_matrix_data, label_names)
 def plot_confusion_matrix(cm, labels):
