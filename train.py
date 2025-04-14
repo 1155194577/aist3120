@@ -45,7 +45,7 @@ WEIGHT_MAP = {
     'B_PER': 1.0,
     'I_PER': 1.0
 }
-LOSS_FUNCTION = "dice_loss" # Options: "cross_entropy", "focal_loss", "dice_loss"
+LOSS_FUNCTION = "focal_loss" # Options: "cross_entropy", "focal_loss", "dice_loss"
 OPTIMIZER = "sgd" # Options: "sgd", "adagrad", "adam"
 class FocalLoss(nn.Module):
     def __init__(self, alpha=1.0, gamma=2.0, ignore_index=-100):

@@ -29,7 +29,7 @@ class classLabel(Enum):
 # Configuration
 MODEL_NAME = "bert-base-cased"
 DATASET_PATH = "conll2003"
-LOSS_FUNCTION = "dice_loss" # Options: "cross_entropy", "focal_loss", "dice_loss"
+LOSS_FUNCTION = "focal_loss" # Options: "cross_entropy", "focal_loss", "dice_loss"
 OPTIMIZER = "sgd" # Options: "sgd", "adagrad", "adam"
 NUM_EPOCHS = 10
 BATCH_SIZE = 64
