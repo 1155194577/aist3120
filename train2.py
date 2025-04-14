@@ -29,7 +29,7 @@ class classLabel(Enum):
 # Configuration
 MODEL_NAME = "bert-base-cased"
 DATASET_PATH = "conll2003"
-LOSS_FUNCTION = "combined_focal_dice_loss" # Options: "cross_entropy", "focal_loss", "dice_loss", "combined_focal_dice_loss"
+LOSS_FUNCTION = "combined_focal_dice_loss" # Options: "cross_entropy", "focal_loss", "dice_loss", "combined_focal_dice_loss", "combined_ce_dice_loss", "combined_ce_focal_loss"
 OPTIMIZER = "sgd" # Options: "sgd", "adagrad", "adam"
 NUM_EPOCHS = 10
 BATCH_SIZE = 64
@@ -100,7 +100,29 @@ class Combined_Focal_Dice_Loss(nn.Module):
     def forward(self, inputs, targets):
         focal_loss_value = self.focal_loss(inputs, targets)
         dice_loss_value = self.dice_loss(inputs, targets)
-        return focal_loss_value + dice_loss_value
+        return focal_loss_value + dice_loss_value 
+    
+class Combined_CE_Dice_Loss(nn.Module):
+    def __init__(self, ignore_index=-100):
+        super(Combined_CE_Dice_Loss, self).__init__()
+        self.cross_entropy_loss = nn.CrossEntropyLoss(ignore_index=ignore_index)
+        self.dice_loss = DiceLoss(ignore_index)
+
+    def forward(self, inputs, targets):
+        ce_loss_value = self.cross_entropy_loss(inputs, targets)
+        dice_loss_value = self.dice_loss(inputs, targets)
+        return ce_loss_value + dice_loss_value
+
+class Combined_CE_Focal_Loss(nn.Module):
+    def __init__(self, alpha=1.0, gamma=2.0, ignore_index=-100):
+        super(Combined_CE_Focal_Loss, self).__init__()
+        self.cross_entropy_loss = nn.CrossEntropyLoss(ignore_index=ignore_index)
+        self.focal_loss = FocalLoss(alpha, gamma, ignore_index)
+    def forward(self, inputs, targets):
+        ce_loss_value = self.cross_entropy_loss(inputs, targets)
+        focal_loss_value = self.focal_loss(inputs, targets)
+        return ce_loss_value + focal_loss_value
+    
 def align_labels_with_tokens(labels, word_ids):
     new_labels = []
     current_word = None
@@ -199,6 +221,10 @@ def get_loss_function(loss_type, weights=None):
         return DiceLoss(ignore_index=-100)
     elif loss_type == "combined_focal_dice_loss":
         return Combined_Focal_Dice_Loss(alpha=1.0, gamma=2.0, ignore_index=-100)
+    elif loss_type == "combined_ce_dice_loss":
+        return Combined_CE_Dice_Loss(ignore_index=-100)
+    elif loss_type == "combined_ce_focal_loss":
+        return Combined_CE_Focal_Loss(alpha=1.0, gamma=2.0, ignore_index=-100) 
     else:
         raise ValueError(f"Unknown loss type: {loss_type}")
     
