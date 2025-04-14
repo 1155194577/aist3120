@@ -309,14 +309,13 @@ def plot_confusion_matrix(cm, labels):
 def plot_results(training_stats):
         x = np.linspace(1, NUM_EPOCHS, num=NUM_EPOCHS)
         plt.figure(figsize=(10, 5))
-        plt.plot(x, training_stats['recalls'], label='Recall')
-        plt.plot(x, training_stats['precisions'], label='Precision')
-        plt.plot(x, training_stats['f1_scores'], label='F1-Score')
+        plt.plot(x, training_stats['validation_f1_scores'], label='Validation F1-Score', color='blue')
+        plt.plot(x, training_stats['training_f1_scores'], label='Training F1-Score', color='green')
         plt.xlabel('Number of Epochs')
-        plt.ylabel('Metrics')
-        plt.title('Evaluation Metrics Over Epochs')
+        plt.ylabel('F1-Score')
+        plt.title('Training and Validation F1-Score Over Epochs')
         plt.legend()
-        plt.savefig('evaluation_metrics.png')  # Save the figure
+        plt.savefig('f1_scores.png')  # Save the figure
         plt.show()
 
         plt.figure(figsize=(10, 5))
@@ -335,14 +334,13 @@ if __name__ == "__main__":
     loaders = create_data_loaders(tokenized_ds, tokenizer)
     model = NERModel(num_labels=len(label_names))
     weights = list(WEIGHT_MAP.values())
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     print(device)
     training_stats = {
         'loss': [],
-        'recalls': [],
-        'precisions': [],
-        'f1_scores': []
+        'training_f1_scores': [],
+        'validation_f1_scores': [],
     }
     
     train_model(model, loaders['train'], loaders['validation'], label_names, weights, training_stats)
